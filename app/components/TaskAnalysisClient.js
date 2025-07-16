@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // --- Helper Icons ---
 const LoadingSpinner = () => (
@@ -24,6 +24,13 @@ const HeartIcon = () => (
     </svg>
 );
 
+const ClipboardIcon = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+    </svg>
+);
+
 // ShapeHero component for levitating shapes
 const ShapeHero = () => (
     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -34,18 +41,42 @@ const ShapeHero = () => (
     </div>
 );
 
+const Toast = ({ message, show }) => {
+    if (!show) return null;
+    return (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 bg-black text-white px-4 py-2 rounded-lg shadow-lg animate-fade-in-out">
+            {message}
+        </div>
+    );
+};
+
+const CopyableRow = ({ label, value, onCopy, isCopied }) => (
+    <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
+        <div className="flex justify-between items-center">
+            <h3 className="font-medium text-gray-500 text-sm uppercase tracking-wider">{label}</h3>
+            <button onClick={() => onCopy(value)} className="text-gray-400 hover:text-black transition-colors">
+                <ClipboardIcon className={`w-4 h-4 ${isCopied ? 'text-green-500' : ''}`} />
+            </button>
+        </div>
+        <p className="text-lg font-medium text-black mt-1">{value}</p>
+    </div>
+);
+
 export default function TaskAnalysisClient({ frameworkMap }) {
     // --- State Management ---
     const [userInput, setUserInput] = useState('');
     const [analysis, setAnalysis] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [copiedField, setCopiedField] = useState(null);
+    const [showToast, setShowToast] = useState(false);
 
 
     // --- Core Functions ---
     const handleAnalysis = async () => {
         setAnalysis(null);
         setError('');
+        setCopiedField(null);
 
         if (userInput.length < 10) {
             setError("Please provide a more detailed task description (at least 10 characters).");
@@ -79,6 +110,9 @@ export default function TaskAnalysisClient({ frameworkMap }) {
            - "Task Framework Category": "learning hour"
            - "Sub-Category": "appreciation / praise"
            - "Recipient": "The name of the person I am thanking."
+           - "Situation (S)": "Describe the context of what happened from my perspective."
+           - "Behavior (B)": "Describe what the person did."
+           - "Impact (I)": "Describe the positive outcome or result of their behavior."
            - "Reason": "The specific reason why I am grateful to them."
 
         **3. If my input is invalid (a greeting, off-topic, etc.):**
@@ -136,6 +170,20 @@ export default function TaskAnalysisClient({ frameworkMap }) {
         }
     };
 
+    const handleCopy = (textToCopy) => {
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            setCopiedField(textToCopy);
+            setShowToast(true);
+            setTimeout(() => {
+                setCopiedField(null);
+                setShowToast(false);
+            }, 2000); // Reset after 2 seconds
+        }).catch(err => {
+            console.error("Failed to copy text: ", err);
+            setError("Could not copy to clipboard.");
+        });
+    };
+
 
 
     return (
@@ -178,26 +226,11 @@ export default function TaskAnalysisClient({ frameworkMap }) {
                             <div className="bg-white p-7 rounded-2xl shadow-xl animate-fade-in border border-gray-100">
                                 <h2 className="text-2xl font-bold text-gray-900 mb-6 tracking-tight">My Reflection</h2>
                                 <div className="space-y-5">
-                                    <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
-                                        <h3 className="font-medium text-gray-500 text-sm uppercase tracking-wider">Framework Point I Missed</h3>
-                                        <p className="text-lg font-medium text-black mt-1">{analysis["Task Framework Category"]} → {analysis["Sub-Category"]}</p>
-                                    </div>
-                                    <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
-                                        <h3 className="font-medium text-gray-500 text-sm uppercase tracking-wider">Situation (S)</h3>
-                                        <p className="text-black mt-2">{analysis["Situation (S)"]}</p>
-                                    </div>
-                                    <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
-                                        <h3 className="font-medium text-gray-500 text-sm uppercase tracking-wider">My Behavior (B)</h3>
-                                        <p className="text-black mt-2">{analysis["Behavior (B)"]}</p>
-                                    </div>
-                                    <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
-                                        <h3 className="font-medium text-gray-500 text-sm uppercase tracking-wider">Impact (I)</h3>
-                                        <p className="text-black mt-2">{analysis["Impact (I)"]}</p>
-                                    </div>
-                                    <div className="p-5 bg-black/5 border border-gray-200 rounded-xl">
-                                        <h3 className="font-medium text-gray-600 text-sm uppercase tracking-wider">My Action Item (A)</h3>
-                                        <p className="font-medium text-black mt-2">{analysis["Action Item (A)"]}</p>
-                                    </div>
+                                    <CopyableRow label="Framework Point I Missed" value={`${analysis["Task Framework Category"]} → ${analysis["Sub-Category"]}`} onCopy={handleCopy} isCopied={copiedField === `${analysis["Task Framework Category"]} → ${analysis["Sub-Category"]}`} />
+                                    <CopyableRow label="Situation (S)" value={analysis["Situation (S)"]} onCopy={handleCopy} isCopied={copiedField === analysis["Situation (S)"]} />
+                                    <CopyableRow label="My Behavior (B)" value={analysis["Behavior (B)"]} onCopy={handleCopy} isCopied={copiedField === analysis["Behavior (B)"]} />
+                                    <CopyableRow label="Impact (I)" value={analysis["Impact (I)"]} onCopy={handleCopy} isCopied={copiedField === analysis["Impact (I)"]} />
+                                    <CopyableRow label="My Action Item (A)" value={analysis["Action Item (A)"]} onCopy={handleCopy} isCopied={copiedField === analysis["Action Item (A)"]} />
                                 </div>
                                 <div className="mt-8 w-full flex">
                                     <button
@@ -214,20 +247,18 @@ export default function TaskAnalysisClient({ frameworkMap }) {
                                     <HeartIcon className="mr-3" /> My Appreciation
                                 </h2>
                                 <div className="space-y-5">
-                                    <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
-                                        <h3 className="font-medium text-gray-500 text-sm uppercase tracking-wider">Praise For</h3>
-                                        <p className="text-lg font-medium text-black mt-1">{analysis["Recipient"]}</p>
-                                    </div>
-                                    <div className="p-5 bg-gray-50 rounded-xl border border-gray-200">
-                                        <h3 className="font-medium text-gray-500 text-sm uppercase tracking-wider">Reason</h3>
-                                        <p className="text-black mt-2">{analysis["Reason"]}</p>
-                                    </div>
+                                    <CopyableRow label="Praise For" value={analysis["Recipient"]} onCopy={handleCopy} isCopied={copiedField === analysis["Recipient"]} />
+                                    <CopyableRow label="Situation (S)" value={analysis["Situation (S)"]} onCopy={handleCopy} isCopied={copiedField === analysis["Situation (S)"]} />
+                                    <CopyableRow label="Behavior (B)" value={analysis["Behavior (B)"]} onCopy={handleCopy} isCopied={copiedField === analysis["Behavior (B)"]} />
+                                    <CopyableRow label="Impact (I)" value={analysis["Impact (I)"]} onCopy={handleCopy} isCopied={copiedField === analysis["Impact (I)"]} />
+                                    <CopyableRow label="Reason" value={analysis["Reason"]} onCopy={handleCopy} isCopied={copiedField === analysis["Reason"]} />
                                 </div>
                             </div>
                         )
                     )}
                 </div>
             </div>
+            <Toast message="Copied to clipboard!" show={showToast} />
         </div>
     );
 }
